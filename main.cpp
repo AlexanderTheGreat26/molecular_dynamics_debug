@@ -205,7 +205,7 @@ bool good_distance (coord& particle, std::vector<coord>& particles) {
 
 
 // Returns initial coordinates of particles evenly distributed over the volume.
-/*std::vector<coord> initial_coordinates () {
+std::vector<coord> initial_coordinates () {
     std::vector<coord> coordinates;
     coord coordinate;
     random_tuple(coordinate, left_border, right_border);
@@ -217,28 +217,8 @@ bool good_distance (coord& particle, std::vector<coord>& particles) {
         coordinates.emplace_back(coordinate);
     }
     return coordinates;
-}*/
-
-
-
-std::vector<coord> initial_coordinates () {
-    double w, l, h;
-    w = l = h = left_border;
-    std::vector<coord> simple_cubic;
-    for (int i = 0; i < N; ++i) {
-        while (w < right_border) {
-            while (l < right_border) {
-                while (h < right_border) {
-                    simple_cubic.emplace_back(std::make_tuple(w, l, h));
-                    h += R_0;
-                }
-                l += R_0;
-            }
-            w += R_0;
-        }
-    }
-    return simple_cubic;
 }
+
 
 
 // Returns uniform distributed in direction velocities with same absolute values.
@@ -350,8 +330,7 @@ return acceleration;
 // DEBUG!
 template<size_t Is = 0, typename... Tp>
 void acceleration_projections (std::tuple<Tp...>& a, std::tuple<Tp...>& q1, std::tuple<Tp...>& q2, double& R_ij) {
-    double F = (R_ij <= R_cutoff && R_ij >= 2.0 * R_Ar) ? single_force(std::fabs(std::get<Is>(q1) - std::get<Is>(q2)))
-                                                        : 0;
+    double F = (R_ij <= R_cutoff && R_ij >= 2.0 * R_Ar) ? single_force(std::fabs(std::get<Is>(q1) - std::get<Is>(q2))) : 0;
     std::get<Is>(a) += (std::isfinite(F) ? F / m : 0);
     if constexpr(Is + 1 != sizeof...(Tp))
         acceleration_projections<Is + 1>(a, q1, q2, R_ij);
