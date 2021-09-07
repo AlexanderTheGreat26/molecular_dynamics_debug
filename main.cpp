@@ -29,20 +29,20 @@ const double R_Ar = 1.88e-8;
 
 // Gas characteristics
 const double P = 1.0e6;
-const double T = 300; // Temperature, K
-const double n = P / k_B / T; // Concentration, 1/cm^-3
+const double T = 80; // Temperature, K
+const double n = 1.4/m; // Concentration, 1/cm^-3
 const double V_init = std::sqrt(3.0 * k_B * T / m); // rms speed corresponding to a given temperature (T), cm/c
 
 
 // Program constants
-const int N = 1e2; //Number of particles
-const double dt = 1.0e-11; // Time-step, c
+const int N = 100; //Number of particles
+const double dt = 1.0e-13; // Time-step, c
 const double simulation_time = 1.0e-8;
 const double R_cutoff = 2.5 * R_0;
 
 
 // Model constants
-const double Volume = N/n * 10; // n corresponds to a unit volume
+const double Volume = N/n*5.0; // n corresponds to a unit volume
 const double characteristic_size = std::pow(Volume, 1.0/3.0);
 const double left_border = -characteristic_size / 2.0;
 const double right_border = characteristic_size / 2.0;
@@ -62,6 +62,7 @@ std::vector<coord> neighboring_cubes; // Contains coordinates of centers virtual
 
 
 std::vector<coord> areas_centers (double a); // Filling the vector upper
+
 
 
 std::random_device rd;  // Will be used to obtain a seed for the random number engine
@@ -102,7 +103,8 @@ int main () {
 
     double t = 0;
     int step = 0;
-    do {
+    //do {
+    while (step < 1000) {
         data_file(trajectory_files_name, coordinates, step);
         data_file(velocities_files_name, velocities, step);
         data_file(accelerations_files_name, accelerations, step);
@@ -110,10 +112,11 @@ int main () {
         t += dt;
         ++step;
         std::cout << step << std::endl;
-    } while (true);
-    //frames(trajectory_files_name, step);
+    }
+    //} while (true);
+    frames(trajectory_files_name, step);
 
-    // exec ("cd " + trajectory_files_path + "&& convert *.jpg out.gif"); // Creates gif... too slow.
+     exec ("cd " + trajectory_files_path + "&& convert *.jpg out.gif"); // Creates gif... too slow.
 
     return 0;
 }
@@ -199,13 +202,13 @@ void random_tuple (std::tuple<Tp...>& coordinate, double left, double right) {
 bool good_distance (coord& particle, std::vector<coord>& particles) {
     bool ans = true;
     for (auto & i : particles)
-        ans &= (distance(particle, i) > R_cutoff / 2.0);
+        ans &= (distance(particle, i) > 2.0*R_Ar);
     return ans;
 }
 
 
 // Returns initial coordinates of particles evenly distributed over the volume.
-/*std::vector<coord> initial_coordinates () {
+std::vector<coord> initial_coordinates () {
     std::vector<coord> coordinates;
     coord coordinate;
     random_tuple(coordinate, left_border, right_border);
@@ -217,28 +220,30 @@ bool good_distance (coord& particle, std::vector<coord>& particles) {
         coordinates.emplace_back(coordinate);
     }
     return coordinates;
-}*/
+}
 
 
 
-std::vector<coord> initial_coordinates () {
+/*std::vector<coord> initial_coordinates () {
     double w, l, h;
     w = l = h = left_border;
     std::vector<coord> simple_cubic;
-    for (int i = 0; i < N; ++i) {
+    int i = 0;
         while (w < right_border) {
             while (l < right_border) {
                 while (h < right_border) {
                     simple_cubic.emplace_back(std::make_tuple(w, l, h));
                     h += R_0;
+                    ++i;
+                    if (i == N) break;
                 }
                 l += R_0;
             }
             w += R_0;
         }
-    }
+
     return simple_cubic;
-}
+}*/
 
 
 // Returns uniform distributed in direction velocities with same absolute values.
@@ -307,11 +312,11 @@ void acceleration_projections (std::tuple<Tp...>& a, std::tuple<Tp...>& q1, std:
     std::get<Is>(a) += (std::isfinite(F) ? F/m : 0);
     if constexpr(Is + 1 != sizeof...(Tp))
         acceleration_projections<Is + 1>(a, q1, q2, R_ij);
-}*/
+}
 
 
 // Will be rewrited with OMP.
-/*std::vector<coord> total_particle_acceleration (std::vector<coord>& particles) {
+std::vector<coord> total_particle_acceleration (std::vector<coord>& particles) {
     std::vector<coord> a (N);
     for (int i = 0; i < N; ++i) {
         for (int j = 0; j < N; ++j)
@@ -322,10 +327,10 @@ void acceleration_projections (std::tuple<Tp...>& a, std::tuple<Tp...>& q1, std:
             }
     }
     return a;
-}*/
+}
 
 
-/*#include "omp.h"
+#include "omp.h"
 std::vector<coord> total_particle_acceleration (std::vector<coord>& particles) {
     std::vector<coord> acceleration (N);
 #pragma omp parallel
@@ -348,14 +353,14 @@ return acceleration;
 
 
 // DEBUG!
-template<size_t Is = 0, typename... Tp>
+/*template<size_t Is = 0, typename... Tp>
 void acceleration_projections (std::tuple<Tp...>& a, std::tuple<Tp...>& q1, std::tuple<Tp...>& q2, double& R_ij) {
-    double F = (R_ij <= R_cutoff && R_ij >= 2.0 * R_Ar) ? single_force(std::fabs(std::get<Is>(q1) - std::get<Is>(q2)))
+    double F = (R_ij < R_cutoff && R_ij > 2.0 * R_Ar) ? single_force(std::fabs(std::get<Is>(q1) - std::get<Is>(q2)))
                                                         : 0;
     std::get<Is>(a) += (std::isfinite(F) ? F / m : 0);
     if constexpr(Is + 1 != sizeof...(Tp))
         acceleration_projections<Is + 1>(a, q1, q2, R_ij);
-}
+}*/
 
 
 template<typename T, size_t... Is>
@@ -392,12 +397,13 @@ double cos_ab (const coord& a, const coord& b) {
 void acceleration_projections_debug (coord& a, coord& q1, coord& q2, double& R_ij) {
     double F = (R_ij <= R_cutoff && R_ij > 2.0 * R_Ar) ? single_force(distance(q1, q2)) : 0;
     double acceleration = (std::isfinite(F) ? F / m : 0);
+    if (!is_equal(acceleration, 0))
+        std::cout << "Here!\n";
     coord direction;
     vector_creation(q1, q2, direction);
-    std::get<0>(a) = cos_ab(direction, x_positive_direction) * acceleration;
-    std::get<1>(a) = cos_ab(direction, y_positive_direction) * acceleration;
-    std::get<2>(a) = cos_ab(direction, z_positive_direction) * acceleration;
-
+    std::get<0>(a) += cos_ab(direction, x_positive_direction) * acceleration;
+    std::get<1>(a) += cos_ab(direction, y_positive_direction) * acceleration;
+    std::get<2>(a) += cos_ab(direction, z_positive_direction) * acceleration;
 }
 
 
@@ -503,6 +509,16 @@ bool is_same (std::vector<coord>& a_1, std::vector<coord>& a_2) {
 }
 
 
+bool only_one_accelerate (std::vector<coord>& acceleration) {
+    int accelerated = 0;
+    coord test = std::make_tuple(0, 0, 0);
+    for (int i = 0; i < N; ++i)
+        if (!equal_tuples(acceleration[i], test))
+            ++accelerated;
+    return (accelerated == 1);
+}
+
+
 void Verlet_integration(std::vector<coord>& q, std::vector<coord>& v, std::vector<coord>& a_current) {
     static bool first_step = true;
 
@@ -513,10 +529,11 @@ void Verlet_integration(std::vector<coord>& q, std::vector<coord>& v, std::vecto
 
     double tau = dt;
     // we can change time step if to particle so close
+
     //int i = 0;
     bool flag;
         // Definition of coordination on next time step:
-        do {
+        //do {
             flag = true;
             for (int i = 0; i < N; ++i) {
                 coordinates_equations(q[i], v[i], a_current[i], tau);
@@ -526,12 +543,19 @@ void Verlet_integration(std::vector<coord>& q, std::vector<coord>& v, std::vecto
                 if (!is_finite_tuple(q[i])) fix(i, q);
             }
 
-            if (so_close(q)) {
+            //if (is_same(q, q_initial))
+              //  break;
+
+
+            /*if (so_close(q)) {
                 flag = false;
                 q = q_initial;
                 tau /= 2.0;
-            }
-        } while (!flag);
+            }*/
+
+
+
+//        } while (!flag);
 
 
             // Definition next time step velocities:
@@ -544,9 +568,12 @@ void Verlet_integration(std::vector<coord>& q, std::vector<coord>& v, std::vecto
                             ++i;
                         } else
                             velocities_equations(v[i], a_current[i], a_next[i], tau);
-                    if (!is_finite_tuple(v[i])) random_tuple(v[i], -V_init/std::sqrt(3.0), V_init/std::sqrt(3)*V_init);
+                    if (!is_finite_tuple(v[i])) random_tuple(v[i], -V_init/std::sqrt(3.0), V_init/std::sqrt(3.0)*V_init);
                 }
                 a_current = a_next;
+
+                if (only_one_accelerate(a_next))
+                    std::cout << "FUCK!\n";
             }
     first_step = false;
 }
