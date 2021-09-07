@@ -24,7 +24,7 @@ const double eps = 119.8; // Potential pit depth (Theta/k_B), K
 const double Theta = k_B * eps;
 const double sigma = 3.405e-8; // Zero potential.
 const double R_0 = sigma * std::pow(2.0, 1.0/6.0); // Minimum potential
-const double R_Ar = 1.88e-8;
+const double R_VdW = 1.88e-8;
 
 
 // Gas characteristics
@@ -202,7 +202,7 @@ void random_tuple (std::tuple<Tp...>& coordinate, double left, double right) {
 bool good_distance (coord& particle, std::vector<coord>& particles) {
     bool ans = true;
     for (auto & i : particles)
-        ans &= (distance(particle, i) > 2.0*R_Ar);
+        ans &= (distance(particle, i) > 2.0*R_VdW);
     return ans;
 }
 
@@ -395,7 +395,7 @@ double cos_ab (const coord& a, const coord& b) {
 
 
 void acceleration_projections_debug (coord& a, coord& q1, coord& q2, double& R_ij) {
-    double F = (R_ij <= R_cutoff && R_ij > 2.0 * R_Ar) ? single_force(distance(q1, q2)) : 0;
+    double F = (R_ij <= R_cutoff && R_ij > 2.0 * R_VdW) ? single_force(distance(q1, q2)) : 0;
     double acceleration = (std::isfinite(F) ? F / m : 0);
     if (!is_equal(acceleration, 0))
         std::cout << "Here!\n";
@@ -469,7 +469,7 @@ bool so_close (std::vector<coord>& q) {
     bool ans = false;
     for (int i = 0; i < q.size(); ++i)
         for (int j = 0; j < q.size(); ++j)
-            if (i != j && distance(q[i], q[j]) <= 2.0*R_Ar) {
+            if (i != j && distance(q[i], q[j]) <= 2.0*R_VdW) {
                 ans = true;
                 break;
             }
