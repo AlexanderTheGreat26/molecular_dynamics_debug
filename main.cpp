@@ -36,7 +36,7 @@ const double V_init = std::sqrt(3.0 * k_B * T / m); // rms speed corresponding t
 
 // Program constants
 const int N = 100; //Number of particles
-const double dt = 1.0e-13; //! Time-step, c
+const double dt = 1.0e-13; // Time-step, c
 const double simulation_time = 1.0e-8;
 const double R_cutoff = 2.5 * R_0;
 
