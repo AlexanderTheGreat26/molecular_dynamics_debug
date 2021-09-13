@@ -36,13 +36,13 @@ const double V_init = std::sqrt(3.0 * k_B * T / m); // rms speed corresponding t
 
 // Program constants
 const int N = 100; //Number of particles
-const double dt = 1.0e-13; // Time-step, c
+const double dt = 1.0e-14; // Time-step, c
 const double simulation_time = 1.0e-8;
-const double R_cutoff = 2.5 * R_0;
+const double R_cutoff = 2.0 * R_0;
 
 
 // Model constants
-const double Volume = N/n*5.0; // n corresponds to a unit volume
+const double Volume = N/n*50.0; // n corresponds to a unit volume
 const double characteristic_size = std::pow(Volume, 1.0/3.0);
 const double left_border = -characteristic_size / 2.0;
 const double right_border = characteristic_size / 2.0;
@@ -77,6 +77,10 @@ std::vector<coord> total_particle_acceleration (std::vector<coord>& particles);
 
 void Verlet_integration(std::vector<coord> &q, std::vector<coord> &v, std::vector<coord> &a);
 
+double Hamiltonian (std::vector<coord>& coordinates, std::vector<coord>& velocities);
+
+double kinetic_energy (std::vector<coord>& velocities);
+
 bool is_equal (double a, double b);
 
 std::string exec (const std::string &str);
@@ -84,6 +88,9 @@ std::string exec (const std::string &str);
 void data_file (std::string& name, std::vector<coord>& data, int& step);
 
 void frames (std::string& name, int& step);
+
+
+
 
 
 int main () {
@@ -101,22 +108,23 @@ int main () {
     std::vector<coord> accelerations = std::move(total_particle_acceleration(coordinates));
     neighboring_cubes = std::move(areas_centers(characteristic_size));
 
+    double H, Energy = Hamiltonian(coordinates, velocities);
+
     double t = 0;
     int step = 0;
     //do {
-    while (step < 1000) {
+    do {
         data_file(trajectory_files_name, coordinates, step);
         data_file(velocities_files_name, velocities, step);
         data_file(accelerations_files_name, accelerations, step);
         Verlet_integration(coordinates, velocities, accelerations);
         t += dt;
         ++step;
-        std::cout << step << std::endl;
-    }
-    //} while (true);
+    } while (step < 10000);
+
     frames(trajectory_files_name, step);
 
-     exec ("cd " + trajectory_files_path + "&& convert *.jpg out.gif"); // Creates gif... too slow.
+    //exec ("cd " + trajectory_files_path + "&& convert *.jpg out.gif"); // Creates gif... too slow.
 
     return 0;
 }
@@ -151,6 +159,30 @@ template <class Tuple>
 double distance (const Tuple& t, const Tuple& t1) {
     constexpr auto size = std::tuple_size<Tuple>{};
     return distance_impl(t, t1, std::make_index_sequence<size>{}, std::make_index_sequence<size>{});
+}
+
+
+template<typename T, size_t... Is>
+double vector_length_impl (T const& t, std::index_sequence<Is...>) {
+    return std::sqrt((std::pow(std::get<Is>(t), 2) + ...));
+}
+
+template <class Tuple>
+double vector_length (const Tuple& t) {
+    constexpr auto size = std::tuple_size<Tuple>{};
+    return vector_length_impl(t, std::make_index_sequence<size>{});
+}
+
+
+template<typename T, size_t... Is>
+double scalar_product_impl (T const& t1, std::index_sequence<Is...>, T const& t2, std::index_sequence<Is...>) {
+    return ((std::get<Is>(t1)*std::get<Is>(t2)) + ...);
+}
+
+template <class Tuple>
+double scalar_product (const Tuple& t1, const Tuple& t2) {
+    constexpr auto size = std::tuple_size<Tuple>{};
+    return scalar_product_impl(t1, std::make_index_sequence<size>{}, t2, std::make_index_sequence<size>{});
 }
 
 
@@ -202,7 +234,7 @@ void random_tuple (std::tuple<Tp...>& coordinate, double left, double right) {
 bool good_distance (coord& particle, std::vector<coord>& particles) {
     bool ans = true;
     for (auto & i : particles)
-        ans &= (distance(particle, i) > 2.0*R_VdW);
+        ans &= (distance(particle, i) > R_cutoff);
     return ans;
 }
 
@@ -223,27 +255,58 @@ std::vector<coord> initial_coordinates () {
 }
 
 
+double potential (double& R) {
+    return 4.0 * Theta * (std::pow(sigma / R, 12) - std::pow(sigma / R, 6));
+}
 
-/*std::vector<coord> initial_coordinates () {
-    double w, l, h;
-    w = l = h = left_border;
-    std::vector<coord> simple_cubic;
-    int i = 0;
-        while (w < right_border) {
-            while (l < right_border) {
-                while (h < right_border) {
-                    simple_cubic.emplace_back(std::make_tuple(w, l, h));
-                    h += R_0;
-                    ++i;
-                    if (i == N) break;
-                }
-                l += R_0;
-            }
-            w += R_0;
+
+double potential_energy (coord& q, std::vector<coord>& coordinates) {
+    double sum = 0;
+    for (auto & coordinate : coordinates) {
+            double R = distance(coordinate, q);
+            if (!is_equal(R, 0) && R < R_cutoff)
+                sum += potential(R) / 2.0; // !!!
         }
+    return sum;
+}
 
-    return simple_cubic;
+
+double kinetic_energy (std::vector<coord>& velocities) {
+    double sum = 0;
+    for (auto & velocity : velocities)
+        sum += scalar_product(velocity, velocity);
+    return m*sum / 2.0;
+}
+
+
+template<typename T, size_t... Is>
+bool insider_impl (T const& t, std::index_sequence<Is...>) {
+    return ((std::fabs(std::get<Is>(t)) < right_border) & ...);
+}
+
+template <class Tuple>
+bool insider (const Tuple& t) {
+    constexpr auto size = std::tuple_size<Tuple>{};
+    return insider_impl(t, std::make_index_sequence<size>{});
+}
+
+
+/*std::vector<coord> insiders (std::vector<coord>& coordinates) {
+    std::vector<coord> inside;
+    for (int i = 0; i < coordinates.size(); ++i)
+        if (insider(coordinates[i]))
 }*/
+
+double Hamiltonian (std::vector<coord>& coordinates, std::vector<coord>& velocities) {
+    double full_energy = 0;
+    for (int i = 0; i < coordinates.size(); ++i)
+        if (insider(coordinates[i]))
+            full_energy += potential_energy(coordinates[i], coordinates) + m * scalar_product(velocities[i], velocities[i]) / 2.0;
+    return full_energy;
+}
+
+
+
 
 
 // Returns uniform distributed in direction velocities with same absolute values.
@@ -361,30 +424,6 @@ void acceleration_projections (std::tuple<Tp...>& a, std::tuple<Tp...>& q1, std:
     if constexpr(Is + 1 != sizeof...(Tp))
         acceleration_projections<Is + 1>(a, q1, q2, R_ij);
 }*/
-
-
-template<typename T, size_t... Is>
-double vector_length_impl (T const& t, std::index_sequence<Is...>) {
-    return std::sqrt((std::pow(std::get<Is>(t), 2) + ...));
-}
-
-template <class Tuple>
-double vector_length (const Tuple& t) {
-    constexpr auto size = std::tuple_size<Tuple>{};
-    return vector_length_impl(t, std::make_index_sequence<size>{});
-}
-
-
-template<typename T, size_t... Is>
-double scalar_product_impl (T const& t1, std::index_sequence<Is...>, T const& t2, std::index_sequence<Is...>) {
-    return ((std::get<Is>(t1)*std::get<Is>(t2)) + ...);
-}
-
-template <class Tuple>
-double scalar_product (const Tuple& t1, const Tuple& t2) {
-    constexpr auto size = std::tuple_size<Tuple>{};
-    return scalar_product_impl(t1, std::make_index_sequence<size>{}, t2, std::make_index_sequence<size>{});
-}
 
 
 // Returns the cosine of angle between two vectors (a, b).
