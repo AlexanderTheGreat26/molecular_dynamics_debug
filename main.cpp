@@ -38,11 +38,11 @@ const double V_init = std::sqrt(3.0 * k_B * T / m); // rms speed corresponding t
 const int N = 100; //Number of particles
 const double dt = 1.0e-14; // Time-step, c
 const double simulation_time = 1.0e-8;
-const double R_cutoff = 2.0 * R_0;
+const double R_cutoff = 2.5 * R_0;
 
 
 // Model constants
-const double Volume = N/n*50.0; // n corresponds to a unit volume
+const double Volume = N/n; // n corresponds to a unit volume
 const double characteristic_size = std::pow(Volume, 1.0/3.0);
 const double left_border = -characteristic_size / 2.0;
 const double right_border = characteristic_size / 2.0;
@@ -102,6 +102,10 @@ int main () {
     std::string accelerations_files_path = std::move(exec("rm -rf accelerations && mkdir accelerations && cd accelerations && echo $PWD"));
     std::string accelerations_files_name = accelerations_files_path + '/' + substance + "_accelerations";
 
+    std::cout << "Start\n";
+
+
+
     // Initials.
     std::vector<coord> coordinates = std::move(initial_coordinates());
     std::vector<coord> velocities = std::move(initial_velocities());
@@ -122,7 +126,7 @@ int main () {
         ++step;
     } while (step < 10000);
 
-    frames(trajectory_files_name, step);
+    //frames(trajectory_files_name, step);
 
     //exec ("cd " + trajectory_files_path + "&& convert *.jpg out.gif"); // Creates gif... too slow.
 
@@ -234,7 +238,7 @@ void random_tuple (std::tuple<Tp...>& coordinate, double left, double right) {
 bool good_distance (coord& particle, std::vector<coord>& particles) {
     bool ans = true;
     for (auto & i : particles)
-        ans &= (distance(particle, i) > R_cutoff);
+        ans &= (distance(particle, i) > sigma);
     return ans;
 }
 
@@ -569,6 +573,7 @@ void Verlet_integration(std::vector<coord>& q, std::vector<coord>& v, std::vecto
     double tau = dt;
     // we can change time step if to particle so close
 
+
     //int i = 0;
     bool flag;
         // Definition of coordination on next time step:
@@ -582,19 +587,19 @@ void Verlet_integration(std::vector<coord>& q, std::vector<coord>& v, std::vecto
                 if (!is_finite_tuple(q[i])) fix(i, q);
             }
 
-            //if (is_same(q, q_initial))
-              //  break;
+            //if (tau < 1.0e-15)
+              // break;
 
 
             /*if (so_close(q)) {
                 flag = false;
                 q = q_initial;
                 tau /= 2.0;
-            }*/
+            }
 
+*/
 
-
-//        } while (!flag);
+  //      } while (!flag);
 
 
             // Definition next time step velocities:
